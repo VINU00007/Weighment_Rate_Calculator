@@ -2,7 +2,7 @@ import re
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
-TOKEN = "PUT_YOUR_NEW_BOT_TOKEN_HERE"
+TOKEN = "8685263578:AAFHGgSNLunjIMFZVNvRqtA4cg7amPXlumI"
 
 
 async def rate_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
