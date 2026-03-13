@@ -2,35 +2,38 @@ import re
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
-TOKEN = "8685263578:AAFHGgSNLunjIMFZVNvRqtA4cg7amPXlumI"
+TOKEN = "PUT_YOUR_CALCULATOR_BOT_TOKEN_HERE"
 
 
 async def rate_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text.strip().lower()
 
-    # If user didn't reply to weighment message
+    # Check if message is reply
     if not update.message.reply_to_message:
         await update.message.reply_text(
             "Reply to the weighment message to calculate the amount."
         )
         return
 
-    # Detect rate input
+    # Detect rate
     try:
         if text.startswith("rate"):
             rate = float(text.split()[1])
         else:
             rate = float(text)
     except:
-        await update.message.reply_text(
-            "Send a number like: 250"
-        )
+        await update.message.reply_text("Send a number like: 250")
         return
 
-    original = update.message.reply_to_message.text
+    # Get original weighment message text
+    original = (
+        update.message.reply_to_message.text
+        or update.message.reply_to_message.caption
+        or ""
+    )
 
-    # Extract weighment details
+    # Extract data
     net = re.search(r"NET LOAD\s*:\s*(\d+)", original)
     rst = re.search(r"RST\s*:\s*(\d+)", original)
     vehicle = re.search(r"🚛\s*([A-Z0-9\-]+)", original)
