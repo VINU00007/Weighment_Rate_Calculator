@@ -4,18 +4,44 @@ from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filte
 
 TOKEN = "8685263578:AAFHGgSNLunjIMFZVNvRqtA4cg7amPXlumI"
 
+# store weighment data using message_id
+weighments = {}
 
-async def rate_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def message_listener(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    message = update.message
+    text = message.text or ""
+
+    # detect weighment alert
+    if "WEIGHMENT ALERT" in text.upper():
+
+        net_match = re.search(r"NET LOAD\s*:\s*(\d+)", text)
+        rst_match = re.search(r"RST\s*:\s*(\d+)", text)
+
+        if net_match:
+            weighments[message.message_id] = {
+                "net": int(net_match.group(1)),
+                "rst": rst_match.group(1) if rst_match else "-"
+            }
+
+        return
+
+
+async def rate_calculator(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     message = update.message
     text = (message.text or "").strip().lower()
 
-    # Accept only numbers or "rate 330"
-    if not text.startswith("rate"):
-        if not re.fullmatch(r"\d+(\.\d+)?", text):
-            return
+    # accept rate or number
+    try:
+        if text.startswith("rate"):
+            rate = float(text.split()[1])
+        else:
+            rate = float(text)
+    except:
+        return
 
-    # Check if replying
     reply = message.reply_to_message
 
     if reply is None:
@@ -24,75 +50,45 @@ async def rate_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Detect rate
-    try:
-        if text.startswith("rate"):
-            rate = float(text.split()[1])
-        else:
-            rate = float(text)
-    except:
-        await message.reply_text("Send a number like: 250")
-        return
+    weighment = weighments.get(reply.message_id)
 
-    # Extract original message text safely
-    original = ""
-
-    if reply.text:
-        original = reply.text
-    elif reply.caption:
-        original = reply.caption
-
-    if not original:
+    if not weighment:
         await message.reply_text(
-            "Could not read the weighment message."
+            "Weighment data not found for this message."
         )
         return
 
-    # Extract data from weighment message
-    net = re.search(r"NET LOAD\s*:\s*(\d+)", original)
-    rst = re.search(r"RST\s*:\s*(\d+)", original)
-    vehicle = re.search(r"🚛\s*([A-Z0-9\-]+)", original)
+    net_kg = weighment["net"]
+    rst = weighment["rst"]
 
-    party = re.search(r"👤\s*(.+)", original)
-    material = re.search(r"MATERIAL\s*:\s*(.+)", original)
-    bags = re.search(r"BAGS\s*:\s*(\d+)", original)
-    time_match = re.search(r"OUT\s*[›>]\s*(.+)", original)
-
-    if not net:
-        await message.reply_text(
-            "Net weight not found in the replied message."
-        )
-        return
-
-    net_kg = int(net.group(1))
     quintals = net_kg / 100
     total = int(quintals * rate)
 
-    msg = (
-        "💰 PAYMENT CALCULATION\n\n"
-        f"🧾 RST No : {rst.group(1) if rst else '-'}\n"
-        f"🚛 Vehicle : {vehicle.group(1) if vehicle else '-'}\n\n"
-        f"👤 Party : {party.group(1) if party else '-'}\n"
-        f"🌾 Material : {material.group(1) if material else '-'}\n"
-        f"📦 Bags : {bags.group(1) if bags else '-'}\n\n"
-        f"🕒 Weighment Time : {time_match.group(1) if time_match else '-'}\n\n"
+    await message.reply_text(
+        f"💰 PAYMENT CALCULATION\n\n"
+        f"RST : {rst}\n\n"
         f"⚖ Net Weight : {net_kg:,} Kg\n"
-        f"📊 Net Quintals : {quintals:.2f}\n\n"
+        f"📊 Quintals : {quintals:.2f}\n"
         f"💵 Rate : ₹{rate}\n\n"
-        "━━━━━━━━━━━━━━━━\n"
-        f"💰 TOTAL AMOUNT : ₹{total:,}\n"
-        "━━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━━━━━\n"
+        f"💰 TOTAL : ₹{total:,}"
     )
-
-    await message.reply_text(msg)
 
 
 def main():
 
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # listen for weighment alerts
     app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, rate_reply)
+        MessageHandler(filters.TEXT & ~filters.COMMAND, message_listener),
+        group=0
+    )
+
+    # calculate rate replies
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, rate_calculator),
+        group=1
     )
 
     print("Rate Calculator Bot Running...")
