@@ -7,11 +7,19 @@ TOKEN = "8685263578:AAFHGgSNLunjIMFZVNvRqtA4cg7amPXlumI"
 
 async def rate_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    text = update.message.text.strip().lower()
+    message = update.message
+    text = (message.text or "").strip().lower()
 
-    # Check if message is reply
-    if not update.message.reply_to_message:
-        await update.message.reply_text(
+    # Ignore non-number messages unless starting with rate
+    if not text.startswith("rate"):
+        if not re.fullmatch(r"\d+(\.\d+)?", text):
+            return
+
+    reply = message.reply_to_message
+
+    # User didn't reply to weighment message
+    if reply is None:
+        await message.reply_text(
             "Reply to the weighment message to calculate the amount."
         )
         return
@@ -23,17 +31,13 @@ async def rate_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             rate = float(text)
     except:
-        await update.message.reply_text("Send a number like: 250")
+        await message.reply_text("Send a number like: 250")
         return
 
     # Get original weighment message text
-    original = (
-        update.message.reply_to_message.text
-        or update.message.reply_to_message.caption
-        or ""
-    )
+    original = reply.text or reply.caption or ""
 
-    # Extract data
+    # Extract weighment data
     net = re.search(r"NET LOAD\s*:\s*(\d+)", original)
     rst = re.search(r"RST\s*:\s*(\d+)", original)
     vehicle = re.search(r"🚛\s*([A-Z0-9\-]+)", original)
@@ -41,10 +45,10 @@ async def rate_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     party = re.search(r"👤\s*(.+)", original)
     material = re.search(r"MATERIAL\s*:\s*(.+)", original)
     bags = re.search(r"BAGS\s*:\s*(\d+)", original)
-    time_match = re.search(r"⟪ OUT ⟫\s*(.+)", original)
+    time_match = re.search(r"OUT\s*[›>]\s*(.+)", original)
 
     if not net:
-        await update.message.reply_text("Net weight not found.")
+        await message.reply_text("Net weight not found in the replied message.")
         return
 
     net_kg = int(net.group(1))
@@ -67,7 +71,7 @@ async def rate_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "━━━━━━━━━━━━━━━━"
     )
 
-    await update.message.reply_text(msg)
+    await message.reply_text(msg)
 
 
 def main():
