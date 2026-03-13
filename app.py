@@ -4,17 +4,16 @@ from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filte
 
 TOKEN = "8685263578:AAFHGgSNLunjIMFZVNvRqtA4cg7amPXlumI"
 
-# store weighment data using message_id
+# store weighment data by message id
 weighments = {}
 
 
-async def message_listener(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def capture_weighment(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     message = update.message
-    text = message.text or ""
+    text = message.text or message.caption or ""
 
-    # detect weighment alert
-    if "WEIGHMENT ALERT" in text.upper():
+    if "NET LOAD" in text.upper():
 
         net_match = re.search(r"NET LOAD\s*:\s*(\d+)", text)
         rst_match = re.search(r"RST\s*:\s*(\d+)", text)
@@ -25,15 +24,13 @@ async def message_listener(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "rst": rst_match.group(1) if rst_match else "-"
             }
 
-        return
 
-
-async def rate_calculator(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def calculate_rate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     message = update.message
     text = (message.text or "").strip().lower()
 
-    # accept rate or number
+    # accept number or "rate 330"
     try:
         if text.startswith("rate"):
             rate = float(text.split()[1])
@@ -44,22 +41,22 @@ async def rate_calculator(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     reply = message.reply_to_message
 
-    if reply is None:
+    if not reply:
         await message.reply_text(
             "Reply to the weighment message to calculate the amount."
         )
         return
 
-    weighment = weighments.get(reply.message_id)
+    data = weighments.get(reply.message_id)
 
-    if not weighment:
+    if not data:
         await message.reply_text(
-            "Weighment data not found for this message."
+            "Weighment data not found for that message."
         )
         return
 
-    net_kg = weighment["net"]
-    rst = weighment["rst"]
+    net_kg = data["net"]
+    rst = data["rst"]
 
     quintals = net_kg / 100
     total = int(quintals * rate)
@@ -79,15 +76,15 @@ def main():
 
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # listen for weighment alerts
+    # first capture weighment messages
     app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, message_listener),
+        MessageHandler(filters.ALL, capture_weighment),
         group=0
     )
 
-    # calculate rate replies
+    # then calculate replies
     app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, rate_calculator),
+        MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_rate),
         group=1
     )
 
